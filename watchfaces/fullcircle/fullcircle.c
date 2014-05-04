@@ -82,6 +82,12 @@ static void do_update_time(struct tm *current_time) {
   // register the minutes
   minutes = current_time->tm_min;
 
+  // re-set the bounds. we shouldn't be doing this from
+  // .update_proc, change doesn't take effect until next render.
+  // but as we're doing this far in advance, it will be ok by 
+  // the time it's needed
+  set_minute_bounds(minutes);
+
   // mark the minute layer as dirty so it will be redrawn
   layer_mark_dirty(minute_layer);
   layer_mark_dirty(deco_layer);
@@ -106,11 +112,6 @@ static void dial_layer_draw(Layer *layer, GContext *ctx) {
  * Draws the minute dial
  */
 static void minute_layer_draw(Layer *layer, GContext *ctx) {
-  // re-set the bounds. we shouldn't be doing this from
-  // .update_proc, change doesn't take effect until next render.
-  // but as we're doing this far in advance, it will be ok by 
-  // the time it's needed
-  set_minute_bounds(minutes);
 
   // rotate the black quadrant that we use to mask the white circle
   gpath_rotate_to(minute_path, (TRIG_MAX_ANGLE * minutes / 60));
@@ -194,14 +195,8 @@ static void window_load(Window *window) {
   layer_add_child(window_layer, dial_layer);
 
   // create the minutes drawing layer
-  GRect mframe;
-  if(minutes < 30) {
-    mframe = GRect(0,0,144,168);
-  } else {
-    mframe = GRect(0,0,(144/2),168);
-  }
   minute_path = gpath_create(&PATH_INFO);
-  minute_layer = layer_create(mframe);
+  minute_layer = layer_create(GRect(0,0,144,168));
   layer_set_clips(minute_layer, true);
   layer_set_update_proc(minute_layer, minute_layer_draw);
   layer_add_child(window_layer, minute_layer);
@@ -244,7 +239,7 @@ static void init(void) {
   window_stack_push(window, animated);
 
   // subscribe to minute tick for clock update
-  tick_timer_service_subscribe(SECOND_UNIT, handle_second_tick);
+  tick_timer_service_subscribe(MINUTE_UNIT, handle_minute_tick);
 }
 
 static void deinit(void) {
