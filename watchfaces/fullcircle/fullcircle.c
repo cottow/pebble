@@ -23,8 +23,10 @@ static uint16_t hour_radius = 30;
 // layers, ordering as on screen
 static Layer *dial_layer;       // the white clock dial
 static Layer *minute_layer;     // the minute marker
-static TextLayer *hour_layer;   // the hour text
 static Layer *deco_layer;       // decorations
+static TextLayer *hour_layer;   // the hour text
+static TextLayer *day_layer;    // extra infos
+static TextLayer *month_layer;  // extra infos
 
 static GPath *minute_path;      // mask for minutes
 static const GPathInfo PATH_INFO = {
@@ -37,17 +39,23 @@ static const GPathInfo PATH_INFO = {
   }
 };
 
+static AppTimer *tap_timer = NULL;
 static char hour_display[3];
+static char day_string[3];
+static char month_string[5];
 static unsigned short minutes = 0;
+static bool has_tapped = false;
 
 /*
  * set the global minutes variable
  */
-static void set_time() {
-  time_t now = time(NULL);
-  struct tm *ltime = localtime(&now);
+static void set_time(struct tm *ltime) {
   minutes = ltime->tm_min;
+  snprintf(hour_display,3,"%d",(int)ltime->tm_hour);
+  snprintf(day_string,3,"%d", (int)ltime->tm_mday);
+  strftime(month_string, sizeof(month_string), "%b", ltime);
 }
+
 /**
  * Set the bounds of the minute layer
  */
@@ -69,14 +77,24 @@ static void set_minute_bounds(unsigned short int m) {
  * of the minute layer
  */
 static void do_update_time(struct tm *current_time) {
+  // update the time variables
+  set_time(current_time);
 
   // update the hour layer
-  snprintf(hour_display,3,"%d",(int)current_time->tm_hour);
   text_layer_set_text(hour_layer, hour_display);
+  text_layer_set_text(day_layer, day_string);
 
-  // register the minutes
-  minutes = current_time->tm_min;
+  if(has_tapped) {
+    // determine wether hours or date should be visible
+    layer_set_hidden(text_layer_get_layer(hour_layer), true);
+    layer_set_hidden(text_layer_get_layer(day_layer), false);
+    layer_set_hidden(text_layer_get_layer(month_layer), false);
 
+  } else {
+    layer_set_hidden(text_layer_get_layer(hour_layer), false);
+    layer_set_hidden(text_layer_get_layer(day_layer), true);
+    layer_set_hidden(text_layer_get_layer(month_layer), true);
+  }
   // re-set the bounds. we shouldn't be doing this from
   // .update_proc, change doesn't take effect until next render.
   // but as we're doing this far in advance, it will be ok by 
@@ -139,10 +157,6 @@ static void minute_layer_draw(Layer *layer, GContext *ctx) {
  * Update the decorations layer
  */
 static void deco_layer_draw(Layer *layer, GContext *ctx) {
-//    graphics_context_set_fill_color(ctx, GColorBlack);
-//    graphics_fill_circle(ctx, center, 42);
-//    graphics_context_set_fill_color(ctx, GColorWhite);
-//    graphics_fill_circle(ctx, center, 33);
     graphics_context_set_fill_color(ctx, GColorBlack);
     graphics_fill_circle(ctx, center, 26);
 }
@@ -155,12 +169,47 @@ static void handle_minute_tick(struct tm *time_tick, TimeUnits units_changed) {
 }
 
 /**
+ * Timer event to disable tapped mode
+ */
+static void tap_timer_handler() {
+  has_tapped = false;
+  // manually trigger update procedures
+  time_t now = time(NULL);
+  struct tm *ltime = localtime(&now);
+  do_update_time(ltime);
+
+}
+
+/**
+ * Handle tap event: show/hide date/hour
+ */
+static void accel_tap_handler(AccelAxisType axis, int32_t direction) {
+  // cancel current timer
+  if(tap_timer != NULL) {
+    app_timer_cancel(tap_timer);
+  }
+
+  // raise the flag
+  has_tapped = true;
+
+  // set timer for untap
+  tap_timer = app_timer_register(1500, tap_timer_handler, NULL);
+
+  // manually trigger update procedures
+  time_t now = time(NULL);
+  struct tm *ltime = localtime(&now);
+  do_update_time(ltime);
+}
+
+/**
  * Create the layers
  */
 static void window_load(Window *window) {
 
   // get the current time
-  set_time();
+  time_t now = time(NULL);
+  struct tm *ltime = localtime(&now);
+  set_time(ltime);
 
   // globals
   window_set_background_color(window, GColorBlack);
@@ -186,13 +235,36 @@ static void window_load(Window *window) {
   layer_add_child(window_layer, deco_layer);
   
   // create the hour display layer
-  int r = 21;
-  hour_layer = text_layer_create(GRect((144/2)-r, (168/2)-r, 2*r, 2*r));
+  int r1 = 21;
+  hour_layer = text_layer_create(GRect((144/2)-r1, (168/2)-r1, 2*r1, 2*r1));
   text_layer_set_text_alignment(hour_layer, GTextAlignmentCenter);
   text_layer_set_text_color(hour_layer, GColorWhite);
   text_layer_set_background_color(hour_layer, GColorClear);
   text_layer_set_font(hour_layer, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK));
+  layer_set_hidden(text_layer_get_layer(hour_layer), false);
   layer_add_child(window_layer, text_layer_get_layer(hour_layer));
+
+  // info layer (text)
+  unsigned int d_height = 38;
+  unsigned int d_width = 42;
+
+  day_layer = text_layer_create(GRect((144/2)-(d_width/2), (168/2)-(d_height)+11, d_width, d_height));
+  text_layer_set_text_color(day_layer, GColorWhite);
+  text_layer_set_background_color(day_layer, GColorClear);
+  text_layer_set_text_alignment(day_layer, GTextAlignmentCenter);
+  text_layer_set_font(day_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
+  text_layer_set_text(day_layer, day_string);
+  layer_set_hidden(text_layer_get_layer(day_layer), true);
+  layer_add_child(window_layer, text_layer_get_layer(day_layer));
+
+  month_layer = text_layer_create(GRect((144/2)-(d_width/2), (168/2)-(d_height/2)+22, d_width, d_height));
+  text_layer_set_text_color(month_layer, GColorWhite);
+  text_layer_set_background_color(month_layer, GColorClear);
+  text_layer_set_text_alignment(month_layer, GTextAlignmentCenter);
+  text_layer_set_font(month_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD));
+  text_layer_set_text(month_layer, month_string);
+  layer_set_hidden(text_layer_get_layer(month_layer), true);
+  layer_add_child(window_layer, text_layer_get_layer(month_layer));
 
 }
 
@@ -219,6 +291,8 @@ static void init(void) {
 
   // subscribe to minute tick for clock update
   tick_timer_service_subscribe(MINUTE_UNIT, handle_minute_tick);
+  // subscribe to tap events
+  accel_tap_service_subscribe(&accel_tap_handler);
 }
 
 static void deinit(void) {
