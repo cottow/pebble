@@ -139,6 +139,12 @@ static void minute_layer_draw(Layer *layer, GContext *ctx) {
  * Update the decorations layer
  */
 static void deco_layer_draw(Layer *layer, GContext *ctx) {
+//    graphics_context_set_fill_color(ctx, GColorBlack);
+//    graphics_fill_circle(ctx, center, 42);
+//    graphics_context_set_fill_color(ctx, GColorWhite);
+//    graphics_fill_circle(ctx, center, 33);
+    graphics_context_set_fill_color(ctx, GColorBlack);
+    graphics_fill_circle(ctx, center, 26);
 }
 
 /**
@@ -174,19 +180,19 @@ static void window_load(Window *window) {
   layer_set_update_proc(minute_layer, minute_layer_draw);
   layer_add_child(window_layer, minute_layer);
 
-  
-  // create the hour display layer
-  int r = 19;
-  hour_layer = text_layer_create(GRect((144/2)-r, (168/2)-r, 2*r, 2*r));
-  text_layer_set_text_alignment(hour_layer, GTextAlignmentCenter);
-  text_layer_set_text_color(hour_layer, GColorWhite);
-  text_layer_set_background_color(hour_layer, GColorBlack);
-  text_layer_set_font(hour_layer, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK));
-  layer_add_child(window_layer, text_layer_get_layer(hour_layer));
-
+  // decorations layer
   deco_layer = layer_create(GRect(0,0,144,168));
   layer_set_update_proc(deco_layer, deco_layer_draw);
   layer_add_child(window_layer, deco_layer);
+  
+  // create the hour display layer
+  int r = 21;
+  hour_layer = text_layer_create(GRect((144/2)-r, (168/2)-r, 2*r, 2*r));
+  text_layer_set_text_alignment(hour_layer, GTextAlignmentCenter);
+  text_layer_set_text_color(hour_layer, GColorWhite);
+  text_layer_set_background_color(hour_layer, GColorClear);
+  text_layer_set_font(hour_layer, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK));
+  layer_add_child(window_layer, text_layer_get_layer(hour_layer));
 
 }
 
