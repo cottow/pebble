@@ -39,7 +39,6 @@ static const GPathInfo PATH_INFO = {
 
 static char hour_display[3];
 static unsigned short minutes = 0;
-static bool init_done = false;
 
 /*
  * set the global minutes variable
@@ -72,11 +71,7 @@ static void set_minute_bounds(unsigned short int m) {
 static void do_update_time(struct tm *current_time) {
 
   // update the hour layer
-  strftime(hour_display, 3, "%H", current_time); 
-  if(hour_display[0] == '0') {
-    hour_display[0] = hour_display[1];
-    hour_display[1] = 0;
-  }
+  snprintf(hour_display,3,"%d",(int)current_time->tm_hour);
   text_layer_set_text(hour_layer, hour_display);
 
   // register the minutes
@@ -132,7 +127,7 @@ static void minute_layer_draw(Layer *layer, GContext *ctx) {
     graphics_fill_rect(ctx, GRect(0,168/2,144/2,168/2), 0, 0);
   }
 
-  if(minutes < 15) {
+  if(minutes <= 15) {
     // hide second quadrant (15-30)
     graphics_context_set_fill_color(ctx, GColorBlack);
     graphics_fill_rect(ctx, GRect(144/2,168/2,144/2,168/2), 0, 0);
@@ -151,28 +146,6 @@ static void deco_layer_draw(Layer *layer, GContext *ctx) {
  */
 static void handle_minute_tick(struct tm *time_tick, TimeUnits units_changed) {
   do_update_time(time_tick);
-}
-
-/**
- * Gets called at new second, finishes init
- *
- * This function is an ugly hack that needs to be changed
- * Apprently, setting the frame in the minute_layer construction didn't work
- * so we need to trigger drawing again to have the clipping applied.
- * We actually only want MINUTE updates, so this function sets dirty,
- * unregisters and sets up the real handler.
- */
-static void handle_second_tick(struct tm *time_tick, TimeUnits units_changed) {
-  // yuck trigger the redraw blech
-  if(!init_done) {
-    init_done = true;
-    layer_mark_dirty(minute_layer);
-  }
-
-  // this handler was a hack anyways
-  tick_timer_service_unsubscribe();
-  // setup the real handler
-  tick_timer_service_subscribe(MINUTE_UNIT, handle_minute_tick);
 }
 
 /**
@@ -203,7 +176,7 @@ static void window_load(Window *window) {
 
   
   // create the hour display layer
-  int r = 17;
+  int r = 19;
   hour_layer = text_layer_create(GRect((144/2)-r, (168/2)-r, 2*r, 2*r));
   text_layer_set_text_alignment(hour_layer, GTextAlignmentCenter);
   text_layer_set_text_color(hour_layer, GColorWhite);
