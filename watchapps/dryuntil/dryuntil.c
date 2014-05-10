@@ -61,8 +61,15 @@ void in_received_handler(DictionaryIterator *received, void *context)
     }
 
     if(rain_d) {
-        text_layer_set_text(status_layer, "Dry until");
-        text_layer_set_text(rain_layer, start);
+        if(rain_d == 2) {
+            // there was an error on the phone receiveing the geolocation
+            text_layer_set_text(status_layer, "No location");
+            text_layer_set_text(rain_layer, "Error");
+        } else {
+            // we've received an update
+            text_layer_set_text(status_layer, "Dry until");
+            text_layer_set_text(rain_layer, start);
+        }
     } else {
         text_layer_set_text(status_layer, "It stays");
         text_layer_set_text(rain_layer, "Dry");

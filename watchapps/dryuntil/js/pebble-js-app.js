@@ -71,14 +71,16 @@ function locationSuccess(pos)
     // we have a loc, get weather
     var coordinates = pos.coords;
     fetchWeather(coordinates.latitude, coordinates.longitude);
+    console.log("Got location, lat="+coordinates.latitude+" lon="+coordinates.longitude);
 }
 
 function locationError(err)
 {
     // error retrieving loc, let watch know
+    console.log("Unable to get location, error code "+err.code);
     Pebble.sendAppMessage( {
         "city": "Unavailable",
-        "rain": 0
+        "rain": 2
     });
 }
 
