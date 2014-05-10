@@ -8,7 +8,7 @@
  * (http://letsmuv.com)
  *
  * Copyright (c) 2014 Christiaan Ottow <chris@6core.net>
- * Distriuted under MIT license, see license.txt
+ * Distriuted under MIT license, see LICENSE
  */
 
 static Window *window;
