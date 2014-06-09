@@ -5,9 +5,12 @@ var rain_starts = "";
 /* send the weather update to pebble if all parameters are received */
 function send_message()
 {
-    if(city == "" || rain == -1 )
+    if(city == "" || rain == -1 ) {
+        console.log("not returning yet, need both rain and city (city="+city+", rain="+rain+")");
         return;
+    }
 
+    console.log("Sending city "+city+" and rain "+rain);
     Pebble.sendAppMessage( {
         "city" : city,
         "rain" : rain,
@@ -22,17 +25,15 @@ function fetchWeather(lat, lon)
     var city_req = new XMLHttpRequest();
 
     // get city for pretty display
-    var city_url = "http://api.openweathermap.org/data/2.1/find/city?" + "lat=" + lat + "&lon=" + lon + "&cnt=1";
+    var city_url = "http://maps.googleapis.com/maps/api/geocode/json?latlng="+lat+","+lon+"&sensor=true";
+    console.log("Requesting URL "+city_url);
     city_req.open('GET', city_url, true);
     city_req.onload = function(e) {
-        if (city_req.readyState == 4) {
-            if(city_req.status == 200) {
-                response = JSON.parse(city_req.responseText);
-                if (response && response.list && response.list.length > 0) {
-                    var weatherResult = response.list[0];
-                    city = weatherResult.name;
-                    send_message();
-                }
+        if (city_req.readyState == 4 && city_req.status == 200) {
+            response = JSON.parse(city_req.responseText);
+            if (response) {
+                city = response.results[0].address_components[2].short_name;
+                send_message();
             }
         }
     }
@@ -42,25 +43,24 @@ function fetchWeather(lat, lon)
 
     // get raininess for location
     rain_url = "http://gps.buienradar.nl/getrr.php?" + "lat=" + lat + "&lon=" + lon; 
+    console.log("Requesting URL "+rain_url);
     rain_req.open('GET', rain_url, true);
     rain_req.onload = function(e) {
-        if (rain_req.readyState == 4) {
-            if(rain_req.status == 200) {
-                rows = rain_req.responseText.split("\n");
-                rain = 0;   // assume no rain
-                for(i=0;i<rows.length;i++) // loop over next hour
+        if (rain_req.readyState == 4 && rain_req.status == 200) {
+            rows = rain_req.responseText.split("\n");
+            rain = 0;   // assume no rain
+            for(i=0;i<rows.length;i++) // loop over next hour
+            {
+                [rs,time] = rows[i].split("|");
+                r = parseInt(rs);
+                if( r > 0 )
+                    rain = 1
+                if(rain_starts == "" && r > 0)
                 {
-                    [rs,time] = rows[i].split("|");
-                    r = parseInt(rs);
-                    if( r > 0 )
-                        rain = 1
-                    if(rain_starts == "" && r > 0)
-                    {
-                        rain_starts = time;
-                    }
+                    rain_starts = time;
                 }
-                send_message();
             }
+            send_message();
         }
     }
     rain_req.send(null);
